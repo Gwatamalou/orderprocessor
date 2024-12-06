@@ -33,10 +33,11 @@
 - **pytest** - тестирование
 - **uv** - менеджер пакетов
 
-## Быстрый старт
+## Быстрый старт (Docker Compose)
 
 ### Требования
-- Docker и Docker Compose
+- Docker 20.10+
+- Docker Compose 2.0+
 - Git
 
 ### Запуск системы
@@ -44,20 +45,51 @@
 1. Клонируйте репозиторий:
 ```bash
 git clone <repository-url>
-cd "order processor"
+cd <project-directory>
 ```
 
 2. Запустите все сервисы через Docker Compose:
 ```bash
-docker-compose up --build
+docker-compose up -d --build
 ```
+
+3. Проверьте статус сервисов:
+```bash
+docker-compose ps
+```
+
+4. Просмотрите логи:
+```bash
+# Все сервисы
+docker-compose logs -f
+
+# Только order_service
+docker-compose logs -f order_service
+
+# Только processor_service
+docker-compose logs -f processor_service
+```
+
+### Доступ к сервисам
 
 Сервисы будут доступны по адресам:
 - **Order Service API**: http://localhost:8000
 - **Order Service Swagger**: http://localhost:8000/docs
+- **Order Service ReDoc**: http://localhost:8000/redoc
 - **Processor Service API**: http://localhost:8001
 - **Processor Service Swagger**: http://localhost:8001/docs
+- **Processor Service ReDoc**: http://localhost:8001/redoc
 - **RabbitMQ Management**: http://localhost:15672 (guest/guest)
+
+### Остановка системы
+
+```bash
+# Остановить сервисы, но сохранить данные
+docker-compose down
+
+# Остановить сервисы и удалить тома с данными
+docker-compose down -v
+```
 
 ### API Endpoints
 
@@ -117,14 +149,14 @@ curl http://localhost:8000/orders/ORDER_ID
 
 ### Order Service
 ```bash
-cd order-service
+cd order_service
 uv pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
 ### Processor Service
 ```bash
-cd processor-service
+cd processor_service
 uv pip install -e ".[dev]"
 pytest tests/ -v
 ```
@@ -135,7 +167,7 @@ pytest tests/ -v
 
 1. Создайте виртуальное окружение:
 ```bash
-cd order-service
+cd order_service
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 ```
@@ -213,13 +245,3 @@ processor-service/
 ├── pyproject.toml
 └── .env.example
 ```
-
-## Возможные улучшения
-
-1. **Мониторинг и метрики**: Интеграция с Prometheus/Grafana
-2. **Трейсинг**: Добавление OpenTelemetry для распределенного трейсинга
-3. **Безопасность**: JWT аутентификация, rate limiting
-4. **Масштабирование**: Kubernetes манифесты, горизонтальное масштабирование
-5. **Персистентность событий**: Event Sourcing паттерн
-6. **Компенсирующие транзакции**: Полная реализация SAGA паттерна
-7. **CI/CD**: GitHub Actions для автоматического тестирования и деплоя
