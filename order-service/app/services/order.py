@@ -1,7 +1,6 @@
 import logging
 import uuid
-import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.order import Order, OrderStatus
@@ -25,8 +24,8 @@ class OrderService:
             items=[item.model_dump() for item in order_data.items],
             total_amount=total_amount,
             status=OrderStatus.PENDING.value,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
 
         created_order = await self.repository.create(order)
@@ -39,12 +38,14 @@ class OrderService:
             created_at=created_order.created_at
         )
 
-        await broker.publish(
-            "order.created",
-            event.model_dump_json().encode()
-        )
-
-        logger.info(f"Order created: {created_order.id}")
+        try:
+            await broker.publish(
+                "order.created",
+                event.model_dump_json().encode()
+            )
+            logger.info(f"Order created: {created_order.id}")
+        except Exception as e:
+            logger.error(f"Failed to publish order.created event for order {created_order.id}: {e}", exc_info=True)
 
         return OrderResponse(
             id=created_order.id,
@@ -81,7 +82,7 @@ class OrderService:
 
         order.status = event.status
         order.error_message = event.error_message
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
 
         await self.repository.update(order)
         logger.info(f"Order updated: {order.id}, status: {order.status}")

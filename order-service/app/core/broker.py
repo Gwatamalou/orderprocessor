@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 import aio_pika
-from aio_pika import Connection, Channel, ExchangeType
+from aio_pika import ExchangeType
 from aio_pika.abc import AbstractRobustConnection, AbstractRobustChannel
 
 from app.core.config import settings
@@ -17,13 +17,20 @@ class RabbitMQBroker:
     async def connect(self) -> None:
         self.connection = await aio_pika.connect_robust(settings.rabbitmq_url)
         self.channel = await self.connection.channel()
-        await self.channel.set_qos(prefetch_count=10)
+        await self.channel.set_qos(prefetch_count=settings.rabbitmq_prefetch_count)
 
         await self.channel.declare_exchange(
             "orders",
             ExchangeType.TOPIC,
             durable=True
         )
+
+        await self.channel.declare_exchange(
+            "orders.dlx",
+            ExchangeType.TOPIC,
+            durable=True
+        )
+
         logger.info("Connected to RabbitMQ")
 
     async def close(self) -> None:

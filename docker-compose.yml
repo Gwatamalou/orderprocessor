@@ -14,6 +14,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   order-db:
     image: postgres:16
@@ -30,6 +38,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   processor-db:
     image: postgres:16
@@ -46,6 +62,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   order-service:
     build:
@@ -58,12 +82,30 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       SERVICE_NAME: order-service
       LOG_LEVEL: INFO
+      CORS_ORIGINS: "*"
+      RABBITMQ_PREFETCH_COUNT: 10
+      DB_POOL_SIZE: 20
+      DB_MAX_OVERFLOW: 10
     depends_on:
       order-db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\").read()'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
   processor-service:
     build:
@@ -76,12 +118,30 @@ services:
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
       SERVICE_NAME: processor-service
       LOG_LEVEL: INFO
+      CORS_ORIGINS: "*"
+      RABBITMQ_PREFETCH_COUNT: 10
+      DB_POOL_SIZE: 20
+      DB_MAX_OVERFLOW: 10
     depends_on:
       processor-db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8001/health\").read()'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
 
 volumes:
   order-db-data:

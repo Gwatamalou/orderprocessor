@@ -1,6 +1,6 @@
 import logging
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.models.processing import ProcessingRecord, ProcessingStatus
 from app.repositories.processing import ProcessingRepository
@@ -27,8 +27,8 @@ class OrderProcessor:
             items=[item.model_dump() for item in event.items],
             total_amount=event.total_amount,
             status=ProcessingStatus.PROCESSING.value,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
 
         await self.repository.create(record)
@@ -38,8 +38,8 @@ class OrderProcessor:
             await self._validate_order(event)
 
             record.status = ProcessingStatus.COMPLETED.value
-            record.processed_at = datetime.utcnow()
-            record.updated_at = datetime.utcnow()
+            record.processed_at = datetime.now(timezone.utc)
+            record.updated_at = datetime.now(timezone.utc)
             await self.repository.update(record)
 
             result_event = OrderProcessedEvent(
@@ -47,18 +47,20 @@ class OrderProcessor:
                 status="completed"
             )
 
-            await broker.publish(
-                "order.processed",
-                result_event.model_dump_json().encode()
-            )
-
-            logger.info(f"Order {event.order_id} processed successfully")
+            try:
+                await broker.publish(
+                    "order.processed",
+                    result_event.model_dump_json().encode()
+                )
+                logger.info(f"Order {event.order_id} processed successfully")
+            except Exception as e:
+                logger.error(f"Failed to publish order.processed event for order {event.order_id}: {e}", exc_info=True)
 
         except Exception as e:
             record.status = ProcessingStatus.FAILED.value
             record.error_message = str(e)
             record.retry_count += 1
-            record.updated_at = datetime.utcnow()
+            record.updated_at = datetime.now(timezone.utc)
             await self.repository.update(record)
 
             result_event = OrderProcessedEvent(
@@ -67,10 +69,13 @@ class OrderProcessor:
                 error_message=str(e)
             )
 
-            await broker.publish(
-                "order.processed",
-                result_event.model_dump_json().encode()
-            )
+            try:
+                await broker.publish(
+                    "order.processed",
+                    result_event.model_dump_json().encode()
+                )
+            except Exception as pub_error:
+                logger.error(f"Failed to publish order.processed event for order {event.order_id}: {pub_error}", exc_info=True)
 
             logger.error(f"Order {event.order_id} processing failed: {e}")
 

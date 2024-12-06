@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -8,6 +9,17 @@ class Settings(BaseSettings):
     rabbitmq_url: str
     service_name: str = "processor-service"
     log_level: str = "INFO"
+    cors_origins: str = "*"
+    rabbitmq_prefetch_count: int = 10
+    db_pool_size: int = 20
+    db_max_overflow: int = 10
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        if not v.startswith("postgresql"):
+            raise ValueError("Only PostgreSQL is supported")
+        return v
 
 
 settings = Settings()
