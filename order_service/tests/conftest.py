@@ -73,3 +73,8 @@ async def mock_broker(monkeypatch):
     monkeypatch.setattr(broker, "publish", mock_publish)
 
     yield published_messages
+
+
+@pytest.fixture
+def test_async_session_maker():
+    return test_async_session_maker

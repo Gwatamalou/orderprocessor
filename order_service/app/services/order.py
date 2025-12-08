@@ -4,16 +4,18 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.models.order import Order, OrderStatus
+from app.models.outbox import OutboxMessage
 from app.repositories.order import OrderRepository
+from app.repositories.outbox import OutboxRepository
 from app.schemas.order import OrderCreate, OrderResponse, OrderCreatedEvent, OrderProcessedEvent, OrderItem
-from app.core.broker import broker
 
 logger = logging.getLogger(__name__)
 
 
 class OrderService:
-    def __init__(self, repository: OrderRepository) -> None:
+    def __init__(self, repository: OrderRepository, outbox_repository: OutboxRepository) -> None:
         self.repository = repository
+        self.outbox_repository = outbox_repository
 
     async def create_order(self, order_data: OrderCreate) -> OrderResponse:
         total_amount = sum(item.price * item.quantity for item in order_data.items)
@@ -38,14 +40,16 @@ class OrderService:
             created_at=created_order.created_at
         )
 
-        try:
-            await broker.publish(
-                "order.created",
-                event.model_dump_json().encode()
-            )
-            logger.info(f"Order created: {created_order.id}")
-        except Exception as e:
-            logger.error(f"Failed to publish order.created event for order {created_order.id}: {e}", exc_info=True)
+        outbox_message = OutboxMessage(
+            aggregate_id=created_order.id,
+            aggregate_type="Order",
+            event_type="order.created",
+            payload=event.model_dump_json(),
+            created_at=datetime.now(timezone.utc)
+        )
+        await self.outbox_repository.create(outbox_message)
+
+        logger.info(f"Order created and saved to outbox: {created_order.id}")
 
         return OrderResponse(
             id=created_order.id,

@@ -6,14 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.logging import setup_logging
 from app.core.broker import broker
-from app.core.database import engine, Base
+from app.core.database import engine, Base, async_session_maker
 from app.core.config import settings
 from app.api.orders import router as orders_router
 from app.api.health import router as health_router
 from app.services.consumer import consumer
+from app.services.outbox_processor import OutboxProcessor
 
 
 shutdown_event = asyncio.Event()
+outbox_processor = OutboxProcessor(async_session_maker, poll_interval=5, batch_size=100, max_retries=3)
 
 
 async def shutdown_handler() -> None:
@@ -33,12 +35,14 @@ async def lifespan(app: FastAPI):
 
     await broker.connect()
     asyncio.create_task(consumer.start())
+    await outbox_processor.start()
 
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
 
     yield
 
+    await outbox_processor.stop()
     await consumer.stop()
     await broker.close()
     await engine.dispose()
